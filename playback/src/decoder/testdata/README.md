@@ -21,3 +21,10 @@ ffmpeg -f lavfi \
   -i 'aevalsrc=0.25*sin(2*PI*440*t)|0.25*sin(2*PI*880*t):s=48000:d=0.25' \
   -c:a flac -map_metadata -1 -fflags +bitexact -flags:a +bitexact stereo-48000.flac
 ```
+
+The Opus fixtures are original two-second sine waves generated with FFmpeg:
+
+```sh
+ffmpeg -f lavfi -i sine=frequency=440:sample_rate=48000:duration=2 -ac 2 -c:a libopus -b:a 48k -metadata 'title=Opus Test' -metadata 'artist=Test Artist' -metadata 'album=Local Fixtures' stereo-48000.opus
+ffmpeg -f lavfi -i sine=frequency=660:sample_rate=48000:duration=2 -ac 1 -c:a libopus -b:a 32k -metadata 'title=Mono Opus' -metadata 'artist=Test Artist' mono-48000.opus
+```

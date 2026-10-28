@@ -73,6 +73,14 @@ impl SymphoniaDecoder {
 
         let decoder_opts: DecoderOptions = Default::default();
 
+        #[cfg(feature = "opus")]
+        let decoder = {
+            let mut codecs = symphonia::core::codecs::CodecRegistry::new();
+            symphonia::default::register_enabled_codecs(&mut codecs);
+            codecs.register_all::<symphonia_adapter_libopus::OpusDecoder>();
+            codecs.make(&track.codec_params, &decoder_opts)?
+        };
+        #[cfg(not(feature = "opus"))]
         let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
 
         let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
@@ -418,6 +426,29 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[cfg(feature = "opus")]
+    #[test]
+    fn opus_decodes_mono_and_stereo_and_seeks_after_eof() {
+        for input in [
+            include_bytes!("testdata/stereo-48000.opus").as_slice(),
+            include_bytes!("testdata/mono-48000.opus").as_slice(),
+        ] {
+            let mut decoder =
+                SymphoniaDecoder::new(Cursor::new(input.to_vec()), Hint::new()).unwrap();
+            let packets = decode_remaining(&mut decoder);
+            let samples: Vec<_> = packets
+                .into_iter()
+                .flat_map(|(_, samples)| samples)
+                .collect();
+            assert!(samples.iter().all(|s| s.is_finite() && s.abs() <= 1.0));
+            assert!(samples.iter().any(|s| s.abs() > 0.05));
+            let frames = samples.len() / 2;
+            assert!((frames as i64 - 88200).abs() < 1000, "{frames}");
+            decoder.seek(1000).unwrap();
+            assert!(!decode_remaining(&mut decoder).is_empty());
+        }
+    }
 
     fn decoder(rate: u32) -> SymphoniaDecoder {
         let input: &[u8] = match rate {

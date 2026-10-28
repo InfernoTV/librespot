@@ -85,7 +85,9 @@ fn visit_dir(dir: &Path, accumulator: &mut LocalFileLookup) -> io::Result<()> {
 
             let lowercase_extension = file_extension.to_lowercase();
 
-            if SUPPORTED_FILE_EXTENSIONS.contains(&lowercase_extension.as_str()) {
+            if SUPPORTED_FILE_EXTENSIONS.contains(&lowercase_extension.as_str())
+                || (cfg!(feature = "opus") && lowercase_extension == "opus")
+            {
                 let uri = match get_uri_from_file(path.as_path(), file_extension) {
                     Ok(uri) => uri,
                     Err(e) => {
@@ -187,6 +189,16 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "opus")]
+    #[test]
+    fn discovers_tagged_opus_files() {
+        let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/decoder/testdata");
+        let lookup = create_local_file_lookup(std::slice::from_ref(&folder));
+        let uri = get_uri_from_file(&folder.join("stereo-48000.opus"), "opus").unwrap();
+        assert!(lookup.get(&uri).unwrap().ends_with("stereo-48000.opus"));
+        assert!(uri.to_uri().contains("Opus+Test"));
+    }
 
     #[test]
     fn directory_links_do_not_recurse_into_ancestors() {
